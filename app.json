@@ -1,0 +1,47 @@
+{
+    "id": "4654652a-5314-43b5-87e6-fb06309c5b1a",
+    "version": "0.0.1",
+    "requiredApiVersion": "^1.19.0",
+    "iconFile": "icon.jpg",
+    "author": {
+        "name": "Svätopluk Hanzel",
+        "homepage": "vunder.io",
+        "support": "vunder.io"
+    },
+    "name": "Reminder",
+    "nameSlug": "reminder",
+    "classFile": "ReminderApp.ts",
+    "description": "Reminds about messages",
+    "permissions": [
+        {
+            "name": "message.write"
+        },
+        {
+            "name": "message.read"
+        },
+        {
+            "name": "room.read"
+        },
+        {
+            "name": "user.read"
+        },
+        {
+            "name": "scheduler"
+        },
+        {
+            "name": "persistence"
+        },
+        {
+            "name": "slashcommand"
+        },
+        {
+            "name": "ui.interact"
+        },
+        {
+            "name": "ui.registerButtons"
+        }
+    ],
+    "implements": [
+        "IUIKitInteractionHandler"
+    ]
+}

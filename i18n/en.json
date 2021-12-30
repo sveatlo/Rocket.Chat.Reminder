@@ -1,0 +1,6 @@
+{
+    "command_params_example": "[something] in [5 minutes | 1 day | 3 days and 4 hours | ...]",
+    "command_description": "Reminds you about something in a specified time",
+
+    "msg_action_button_remind_label": "Remind me later"
+}
