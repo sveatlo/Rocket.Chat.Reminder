@@ -9,9 +9,17 @@ import {
     SlashCommandContext,
 } from "@rocket.chat/apps-engine/definition/slashcommands";
 import * as sherlock from "sherlockjs";
+import { formatDistanceToNow } from "date-fns";
 
-import { RemindersController } from "./Controller";
-import { Reminder, ReminderType } from "./Reminder";
+import { Reminder, ReminderType } from "./lib/reminder";
+import { sendNotification } from "./lib/sendNotification";
+import {
+    actionListAllReminders,
+    actionCreateReminder,
+    actionDeleteAllReminders,
+    actionDeleteAllCompletedReminders,
+} from "./lib/ui/actions";
+import { createReminderModalView } from "./lib/ui/createReminderModal";
 
 export class RemindCommand implements ISlashCommand {
     public command = "remind";
@@ -19,7 +27,7 @@ export class RemindCommand implements ISlashCommand {
     public i18nDescription = "command_description";
     public providesPreview = false;
 
-    constructor(private controller: RemindersController) {}
+    constructor() {}
 
     public async executor(
         context: SlashCommandContext,
@@ -54,7 +62,7 @@ export class RemindCommand implements ISlashCommand {
                 const user = context.getSender();
                 const room = context.getRoom();
                 const threadID = context.getThreadId();
-                this.controller.listAllReminders(
+                actionListAllReminders(
                     read,
                     modify,
                     read.getPersistenceReader(),
@@ -65,10 +73,10 @@ export class RemindCommand implements ISlashCommand {
                 break;
 
             case "delete": {
-                const [_, which] = context.getArguments();
-                switch (which) {
+                const [_, deleteType] = context.getArguments();
+                switch (deleteType) {
                     case "all":
-                        this.controller.deleteAllReminders(
+                        actionDeleteAllReminders(
                             read,
                             modify,
                             persist,
@@ -80,7 +88,7 @@ export class RemindCommand implements ISlashCommand {
                         );
                         break;
                     case "completed":
-                        this.controller.deleteAllCompletedReminders(
+                        actionDeleteAllCompletedReminders(
                             read,
                             modify,
                             persist,
@@ -105,9 +113,46 @@ export class RemindCommand implements ISlashCommand {
                 const threadID = context.getThreadId();
 
                 const args = context.getArguments().join(" ");
-                const { eventTitle: subject, startDate: when } = sherlock.parse(
-                    args
-                );
+                const {
+                    eventTitle: subject,
+                    startDate: when,
+                }: {
+                    eventTitle?: string;
+                    startDate?: Date;
+                } = sherlock.parse(args);
+
+                if (!subject || !when) {
+                    const triggerId = context.getTriggerId();
+                    if (triggerId) {
+                        modify.getUiController().openModalView(
+                            await createReminderModalView(
+                                room.id,
+                                modify,
+                                persist,
+                                undefined,
+                                {
+                                    subject: subject,
+                                    when: when
+                                        ? formatDistanceToNow(when)
+                                        : undefined,
+                                }
+                            ),
+                            { triggerId },
+                            user
+                        );
+                    } else {
+                        sendNotification(
+                            read,
+                            modify,
+                            "Cannot parse command. Please check syntax",
+                            user,
+                            room,
+                            threadID
+                        );
+                    }
+
+                    return;
+                }
 
                 const reminder = new Reminder(
                     ReminderType.GENERIC,
@@ -116,7 +161,7 @@ export class RemindCommand implements ISlashCommand {
                     subject,
                     false
                 );
-                this.controller.createReminder(
+                actionCreateReminder(
                     read,
                     modify,
                     persist,
@@ -127,62 +172,4 @@ export class RemindCommand implements ISlashCommand {
             }
         }
     }
-
-    // public async executor(
-    //     context: SlashCommandContext,
-    //     read: IRead,
-    //     modify: IModify,
-    //     _http: IHttp,
-    //     _persist: IPersistence
-    // ): Promise<void> {
-    //     // TODO: parse message
-    //     // who: (me|[#@][a-z0-9-_]+)
-    //     // subject: (to|about) ((?<subject_1>"(.*)")|(?<subject_2>.*) ((at|in|every|on))|(?<subject_3>.*$))
-    //     // when:
-    //
-    //     const notifyMessageBuilder = modify
-    //         .getCreator()
-    //         .startMessage()
-    //         .setRoom(context.getRoom())
-    //         .setSender(
-    //             (await read.getUserReader().getAppUser()) || context.getSender()
-    //         );
-    //     const threadID = context.getThreadId();
-    //     if (threadID) {
-    //         notifyMessageBuilder.setThreadId(threadID);
-    //     }
-    //
-    //     const args = context.getArguments();
-    //     // take all args as `when` if no "in" was found
-    //     const inIndex = Math.max(
-    //         args.findIndex((x) => x == "in"),
-    //         0
-    //     );
-    //     const message = args.slice(0, inIndex).join(" ");
-    //     const when = args.slice(inIndex + 1).join(" ");
-    //
-    //     try {
-    //         await modify.getScheduler().scheduleOnce({
-    //             id: "reminder",
-    //             when: when,
-    //             data: {
-    //                 user: context.getSender(),
-    //                 room: context.getRoom(),
-    //                 threadID: context.getThreadId(),
-    //                 message: message,
-    //             },
-    //         });
-    //         notifyMessageBuilder.setText(
-    //             `Success! I'll notify you here in ${when}.`
-    //         );
-    //     } catch (error) {
-    //         notifyMessageBuilder.setText(
-    //             `Cannot add reminder :( (error: ${error})`
-    //         );
-    //     }
-    //
-    //     modify
-    //         .getNotifier()
-    //         .notifyUser(context.getSender(), notifyMessageBuilder.getMessage());
-    // }
 }

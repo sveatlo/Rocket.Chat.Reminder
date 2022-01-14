@@ -1,18 +1,33 @@
 {
-    "id": "4654652a-5314-43b5-87e6-fb06309c5b1a",
+    "id": "fe4583cc-01e5-4f87-8cac-b22d259a23ec",
     "version": "0.0.1",
     "requiredApiVersion": "^1.19.0",
     "iconFile": "icon.jpg",
     "author": {
         "name": "Svätopluk Hanzel",
-        "homepage": "vunder.io",
-        "support": "vunder.io"
+        "homepage": "https://vunder.io",
+        "support": "https://vunder.io"
     },
     "name": "Reminder",
     "nameSlug": "reminder",
     "classFile": "ReminderApp.ts",
     "description": "Reminds about messages",
     "permissions": [
+        {
+            "name": "scheduler"
+        },
+        {
+            "name": "slashcommand"
+        },
+        {
+            "name": "persistence"
+        },
+        {
+            "name": "ui.registerButtons"
+        },
+        {
+            "name": "ui.interact"
+        },
         {
             "name": "message.write"
         },
@@ -23,22 +38,10 @@
             "name": "room.read"
         },
         {
+            "name": "room.write"
+        },
+        {
             "name": "user.read"
-        },
-        {
-            "name": "scheduler"
-        },
-        {
-            "name": "persistence"
-        },
-        {
-            "name": "slashcommand"
-        },
-        {
-            "name": "ui.interact"
-        },
-        {
-            "name": "ui.registerButtons"
         }
     ],
     "implements": [

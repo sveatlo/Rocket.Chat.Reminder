@@ -1,83 +1,50 @@
 import {
-    ILogger,
     IRead,
     IModify,
-    IPersistence,
     IHttp,
+    IPersistence,
 } from "@rocket.chat/apps-engine/definition/accessors";
+import { IJobContext } from "@rocket.chat/apps-engine/definition/scheduler/IProcessor";
+
+import { sendDirectMessage } from "./lib/sendDirectMessage";
+import { getReminderByRecordID } from "./lib/crud";
 import {
-    IProcessor,
-    IJobContext,
-    StartupType,
-} from "@rocket.chat/apps-engine/definition/scheduler/IProcessor";
+    createMarkCompletedButton,
+    createTimeDropdown,
+} from "./lib/ui/components";
 
-export class RemindsProcessor implements IProcessor {
-    public id: string = "reminder";
-    public startupSettings = {
-        type: StartupType.ONETIME,
-        when: "20 seconds",
-        data: {
-            test: true,
-        },
-    };
-    private logger: ILogger;
+export const processor = async (
+    jobData: IJobContext,
+    read: IRead,
+    modify: IModify,
+    _http: IHttp,
+    _persis: IPersistence
+): Promise<void> => {
+    const { recordID } = jobData;
+    const reminder = await getReminderByRecordID(
+        recordID,
+        read.getPersistenceReader()
+    );
 
-    constructor(logger: ILogger, controller) {
-        this.logger = logger;
-        this.logger.info("processor created");
-    }
+    const blockBuilder = modify.getCreator().getBlockBuilder();
+    blockBuilder.addSectionBlock({
+        text: blockBuilder.newPlainTextObject(
+            `You asked me to remind you about "${reminder.subject}"`
+        ),
+    });
+    blockBuilder.addActionsBlock({
+        blockId: reminder.id,
+        elements: [
+            createMarkCompletedButton(reminder.id),
+            createTimeDropdown("Snooze", "snooze"),
+        ],
+    });
 
-    public async processor(
-        jobData: IJobContext,
-        read: IRead,
-        modify: IModify,
-        _http: IHttp,
-        _persis: IPersistence
-    ): Promise<void> {
-        // TODO: this is null for some reason...
-        const { user, room, threadID, message } = jobData;
-
-        const notifyMessageBuilder = modify
-            .getCreator()
-            .startMessage()
-            .setRoom(room)
-            .setSender((await read.getUserReader().getAppUser()) || user);
-        if (threadID) {
-            notifyMessageBuilder.setThreadId(threadID);
-        }
-
-        // const blockBuilder = modify.getCreator().getBlockBuilder();
-        // const snoozeButton = blockBuilder.newStaticSelectElement({
-        //     placeholder: blockBuilder.newPlainTextObject("Snooze"),
-        //     options: [
-        //         {
-        //             value: "10min",
-        //             text: blockBuilder.newPlainTextObject("10 minutes"),
-        //         },
-        //         {
-        //             value: "30min",
-        //             text: blockBuilder.newPlainTextObject("30 minutes"),
-        //         },
-        //     ],
-        // });
-        // const actionsBlock = blockBuilder.addActionsBlock({
-        //     blockId: "reminder_msg_actions",
-        //     elements: [snoozeButton],
-        // });
-        // notifyMessageBuilder.addBlocks(actionsBlock);
-
-        if (message) {
-            notifyMessageBuilder.setText(
-                `Hey there! Reminding you about "${message}" ;)`
-            );
-        } else {
-            notifyMessageBuilder.setText(
-                `Hey there! This is a quick reminder to look back here ;)`
-            );
-        }
-
-        modify
-            .getNotifier()
-            .notifyUser(user, notifyMessageBuilder.getMessage());
-    }
-}
+    sendDirectMessage(
+        read,
+        modify,
+        `You asked me to remind you about "${reminder.subject}"`,
+        reminder.user,
+        blockBuilder
+    );
+};
