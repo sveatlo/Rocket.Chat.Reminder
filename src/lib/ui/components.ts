@@ -43,12 +43,12 @@ const defaultTimeOptions = [
         text: newPlainTextObject("2 hours"),
     },
     {
-        value: "tomorrow",
-        text: newPlainTextObject("Tomorrow"),
+        value: "tomorrow at 9am",
+        text: newPlainTextObject("Tomorrow at 9am"),
     },
     {
-        value: "next_week",
-        text: newPlainTextObject("Next week"),
+        value: "next monday at 9am",
+        text: newPlainTextObject("Next Monday at 9am"),
     },
 ];
 export const createTimeDropdown = (

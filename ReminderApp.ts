@@ -12,7 +12,6 @@ import { App } from "@rocket.chat/apps-engine/definition/App";
 import { IAppInfo } from "@rocket.chat/apps-engine/definition/metadata";
 import { UIActionButtonContext } from "@rocket.chat/apps-engine/definition/ui";
 import {
-    ButtonStyle,
     IUIKitInteractionHandler,
     IUIKitResponse,
     UIKitActionButtonInteractionContext,
@@ -32,7 +31,6 @@ import { Reminder, ReminderType } from "./src/lib/reminder";
 import {
     deleteModalContextByViewID,
     getModalContextByViewID,
-    markReminderCompleted,
     snoozeReminder,
 } from "./src/lib/crud";
 import { UIKitIncomingInteractionContainerType } from "@rocket.chat/apps-engine/definition/uikit/UIKitIncomingInteractionContainer";
@@ -248,19 +246,7 @@ export class RcAppReportMessageApp
             throw new Error("cannot get app user");
         }
 
-        if (!message || !message.id) {
-            if (
-                container.type === UIKitIncomingInteractionContainerType.MESSAGE
-            ) {
-                message = await read.getMessageReader().getById(container.id);
-            }
-
-            if (!message) {
-                throw new Error("cannot get message for interaction");
-            }
-        }
-
-        if (!message.room) {
+        if (!message?.room) {
             throw new Error("cannot get room for interaction");
         }
 
@@ -291,6 +277,10 @@ export class RcAppReportMessageApp
                     persist,
                     read.getPersistenceReader()
                 );
+
+                // TODO: delete the message when implemented to AppsEngine (RocketChat/Rocket.Chat.Apps-engine/issues/445)
+                builder.setText(``);
+                await modify.getUpdater().finish(builder);
 
                 break;
             }

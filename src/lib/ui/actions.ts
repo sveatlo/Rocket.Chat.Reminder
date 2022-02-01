@@ -21,7 +21,6 @@ import { sendNotification } from "../sendNotification";
 import { Reminder } from "../reminder";
 import { createMarkCompletedButton } from "./components";
 import { MessageContext } from "../messageContext";
-import { sendDirectMessage } from "../sendDirectMessage";
 
 export const actionCreateReminder = async (
     read: IRead,
@@ -209,6 +208,34 @@ export const actionMarkReminderCompleted = async (
         read,
         modify,
         `👍 Marked as complete`,
+        user,
+        context.room,
+        context.threadID
+    );
+};
+
+export const actionSnoozeReminder = async (
+    reminderID: string,
+    when: Date | string,
+    user: IUser,
+    context: MessageContext,
+    read: IRead,
+    modify: IModify,
+    persist: IPersistence,
+    persistRead: IPersistenceRead
+) => {
+    await snoozeReminder(
+        reminderID,
+        when,
+        modify.getScheduler(),
+        persist,
+        persistRead
+    );
+
+    sendNotification(
+        read,
+        modify,
+        `👍 I'll remind you again later`,
         user,
         context.room,
         context.threadID
