@@ -25,7 +25,9 @@ import { RemindCommand } from "./src/Command";
 import { createReminderModalView } from "./src/lib/ui/createReminderModal";
 import {
     actionCreateReminder,
+    actionListAllReminders,
     actionMarkReminderCompleted,
+    actionSnoozeReminder,
 } from "./src/lib/ui/actions";
 import { Reminder, ReminderType } from "./src/lib/reminder";
 import {
@@ -183,28 +185,12 @@ export class RcAppReportMessageApp
         modify: IModify
     ): Promise<IUIKitResponse> {
         let { user, room, message, container } = context.getInteractionData();
-        console.log("block action data", context.getInteractionData());
+        this.getLogger().debug(
+            "block action data",
+            context.getInteractionData()
+        );
 
         try {
-            if (!message || !message.id) {
-                if (
-                    container.type ===
-                    UIKitIncomingInteractionContainerType.MESSAGE
-                ) {
-                    message = await read
-                        .getMessageReader()
-                        .getById(container.id);
-                }
-
-                if (!message) {
-                    throw new Error("cannot get message for interaction");
-                }
-            }
-
-            if (!message.room) {
-                throw new Error("cannot get room for interaction");
-            }
-
             return this.processBlockActionHandler(
                 context,
                 read,
@@ -215,8 +201,11 @@ export class RcAppReportMessageApp
         } catch (error) {
             this.getLogger().error(error);
 
-            if (!message) {
-                throw error;
+            if (!room) {
+                room = message?.room;
+                if (!room) {
+                    throw error;
+                }
             }
 
             sendNotification(
@@ -224,7 +213,7 @@ export class RcAppReportMessageApp
                 modify,
                 `An unexpected error occured: ${error}`,
                 user,
-                message?.room
+                room
             );
 
             return context.getInteractionResponder().errorResponse();
@@ -238,7 +227,7 @@ export class RcAppReportMessageApp
         persist: IPersistence,
         modify: IModify
     ): Promise<IUIKitResponse> {
-        let { actionId, blockId, value, user, message, container } =
+        let { actionId, blockId, value, user, room, message } =
             context.getInteractionData();
 
         const appUser = await read.getUserReader().getAppUser();
@@ -246,11 +235,15 @@ export class RcAppReportMessageApp
             throw new Error("cannot get app user");
         }
 
-        if (!message?.room) {
-            throw new Error("cannot get room for interaction");
+        if (!room) {
+            room = message?.room;
+
+            if (!room) {
+                throw new Error("cannot get room for interaction");
+            }
         }
 
-        console.log(
+        this.getLogger().debug(
             "handling block action",
             actionId,
             blockId,
@@ -258,29 +251,37 @@ export class RcAppReportMessageApp
             context.getInteractionData()
         );
 
+        // replace original message with processing notice
+        if (message?.id) {
+            const builder = await modify
+                .getUpdater()
+                .message(message.id as string, user);
+            builder.setEditor(builder.getSender());
+            builder.setBlocks([]);
+            builder.setText(`⏳ processing...`);
+            await modify.getUpdater().finish(builder);
+        }
+
         switch (actionId) {
             case "markCompleted": {
-                const builder = await modify
-                    .getUpdater()
-                    .message(message?.id as string, user);
-                builder.setEditor(builder.getSender());
-                builder.setBlocks([]);
-                builder.setText(`⏳ processing...`);
-                await modify.getUpdater().finish(builder);
-
                 await actionMarkReminderCompleted(
                     blockId,
                     user,
-                    { room: message.room },
+                    { room: room },
                     read,
                     modify,
                     persist,
                     read.getPersistenceReader()
                 );
 
-                // TODO: delete the message when implemented to AppsEngine (RocketChat/Rocket.Chat.Apps-engine/issues/445)
-                builder.setText(``);
-                await modify.getUpdater().finish(builder);
+                await actionListAllReminders(
+                    read,
+                    modify,
+                    read.getPersistenceReader(),
+                    user,
+                    room,
+                    message?.threadId
+                );
 
                 break;
             }
@@ -290,18 +291,13 @@ export class RcAppReportMessageApp
                     return context.getInteractionResponder().errorResponse();
                 }
 
-                const builder = await modify
-                    .getUpdater()
-                    .message(message?.id as string, user);
-                builder.setEditor(builder.getSender());
-                builder.setBlocks([]);
-                builder.setText(`⏳ processing...`);
-                await modify.getUpdater().finish(builder);
-
-                await snoozeReminder(
+                await actionSnoozeReminder(
                     blockId,
                     value,
-                    modify.getScheduler(),
+                    user,
+                    { room },
+                    read,
+                    modify,
                     persist,
                     read.getPersistenceReader()
                 );
@@ -311,6 +307,16 @@ export class RcAppReportMessageApp
 
             default:
                 throw new Error(`unknown action "${actionId}"`);
+        }
+
+        // delete processing notice
+        if (message?.id) {
+            // TODO: delete the message when implemented to AppsEngine (RocketChat/Rocket.Chat.Apps-engine/issues/445)
+            const builder = await modify
+                .getUpdater()
+                .message(message.id as string, user);
+            builder.setText(``);
+            await modify.getUpdater().finish(builder);
         }
 
         return context.getInteractionResponder().successResponse();

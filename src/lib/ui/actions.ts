@@ -16,6 +16,7 @@ import {
     deleteAllCompletedReminders,
     snoozeReminder,
     markReminderCompleted,
+    getReminderByID,
 } from "../crud";
 import { sendNotification } from "../sendNotification";
 import { Reminder } from "../reminder";
@@ -32,7 +33,15 @@ export const actionCreateReminder = async (
     creationContext: MessageContext
 ) => {
     await addReminder(reminder, scheduler, persist);
+    IllRemindYouNotification(read, modify, reminder, creationContext);
+};
 
+const IllRemindYouNotification = async (
+    read: IRead,
+    modify: IModify,
+    reminder: Reminder,
+    creationContext: MessageContext
+) => {
     sendNotification(
         read,
         modify,
@@ -175,6 +184,8 @@ export const actionDeleteAllCompletedReminders = async (
 export const actionSnooze = async (
     reminderID: string,
     newWhen: Date | string,
+    context: MessageContext,
+    read: IRead,
     modify: IModify,
     persist: IPersistence,
     persistRead: IPersistenceRead
@@ -186,6 +197,9 @@ export const actionSnooze = async (
         persist,
         persistRead
     );
+
+    const reminder = await getReminderByID(reminderID, persistRead);
+    IllRemindYouNotification(read, modify, reminder, context);
 };
 
 export const actionMarkReminderCompleted = async (
